@@ -1,0 +1,6 @@
+2026/01/06-20:36:49.007 41c8 Reusing MANIFEST C:\Users\MAX\simamiaKodi backend\.wwebjs_auth\session-simamiakodi-client\Default\Local Storage\leveldb/MANIFEST-000001
+2026/01/06-20:36:49.008 41c8 Recovering log #7
+2026/01/06-20:36:49.009 41c8 Reusing old log C:\Users\MAX\simamiaKodi backend\.wwebjs_auth\session-simamiakodi-client\Default\Local Storage\leveldb/000007.log 
+2026/01/06-21:07:01.530 2fd8 Level-0 table #11: started
+2026/01/06-21:07:01.566 2fd8 Level-0 table #11: 15941 bytes OK
+2026/01/06-21:07:01.572 2fd8 Delete type=0 #7
