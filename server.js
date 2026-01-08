@@ -37,6 +37,37 @@ app.get('/api/health', async (req, res) => {
     });
   }
 });
+// Keep-alive endpoint for preventing cold starts
+app.get('/api/keep-alive', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Server is alive',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// Self-ping function (optional - runs from within the app)
+if (process.env.NODE_ENV === 'production' && process.env.ENABLE_KEEP_ALIVE === 'true') {
+  const SELF_PING_INTERVAL = 10 * 60 * 1000; // 10 minutes
+  
+  setInterval(async () => {
+    try {
+      const https = require('https');
+      const url = process.env.RENDER_EXTERNAL_URL || 'https://simamiakodi-backend.onrender.com';
+      
+      https.get(`${url}/api/keep-alive`, (res) => {
+        console.log(`✓ Self-ping successful (Status: ${res.statusCode})`);
+      }).on('error', (err) => {
+        console.error('✗ Self-ping failed:', err.message);
+      });
+    } catch (error) {
+      console.error('✗ Self-ping error:', error.message);
+    }
+  }, SELF_PING_INTERVAL);
+  
+  console.log('✓ Keep-alive self-ping enabled (every 10 minutes)');
+}
 
 // ============================================
 // ADD AUTH ROUTES HERE (BEFORE OTHER ROUTES)
