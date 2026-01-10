@@ -57,16 +57,16 @@ if (process.env.NODE_ENV === 'production' && process.env.ENABLE_KEEP_ALIVE === '
       const url = process.env.RENDER_EXTERNAL_URL || 'https://simamiakodi-backend.onrender.com';
       
       https.get(`${url}/api/keep-alive`, (res) => {
-        console.log(`✓ Self-ping successful (Status: ${res.statusCode})`);
+        console.log(` Self-ping successful (Status: ${res.statusCode})`);
       }).on('error', (err) => {
-        console.error('✗ Self-ping failed:', err.message);
+        console.error(' Self-ping failed:', err.message);
       });
     } catch (error) {
-      console.error('✗ Self-ping error:', error.message);
+      console.error(' Self-ping error:', error.message);
     }
   }, SELF_PING_INTERVAL);
   
-  console.log('✓ Keep-alive self-ping enabled (every 10 minutes)');
+  console.log(' Keep-alive self-ping enabled (every 10 minutes)');
 }
 
 // ============================================
@@ -84,9 +84,9 @@ try {
 try {
   const tenantRoutes = require('./routes/tenantRoutes');
   app.use('/api/tenants', tenantRoutes);
-  console.log('✓ Tenant routes loaded');
+  console.log(' Tenant routes loaded');
 } catch (err) {
-  console.error('✗ Tenant routes failed:', err.message);
+  console.error(' Tenant routes failed:', err.message);
 }
 
 try {
