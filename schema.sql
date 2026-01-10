@@ -162,7 +162,6 @@ CREATE TABLE payments (
     payment_status VARCHAR(50) DEFAULT 'completed',
     reference_number VARCHAR(100),
     mpesa_code VARCHAR(100),
-    payment_status VARCHAR(50) DEFAULT 'completed',
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
