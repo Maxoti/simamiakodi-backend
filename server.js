@@ -29,7 +29,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5500',
   'https://simamiakodi-frontend.vercel.app',
-  'https://simamiakodi-frontend-git-main-edusync.vercel.app'
+  'https://simamiakodi-frontend-git-main-edusync1.vercel.app'
 ];
 
 app.use(cors({
@@ -37,7 +37,18 @@ app.use(cors({
     // Allow requests with no origin (mobile apps, Postman)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.includes(origin)) {
+    // Check if origin matches any allowed origin (string or regex)
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return allowed === origin;
+      }
+      if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
       callback(null, true);
     } else {
       console.warn(`⚠️ Blocked CORS request from: ${origin}`);
@@ -121,26 +132,33 @@ app.get('/api/keep-alive', (req, res) => {
 // SELF-PING (KEEP SERVER WARM)
 // ============================================
 
-if (NODE_ENV === 'production' && process.env.ENABLE_KEEP_ALIVE === 'true') {
-  const SELF_PING_INTERVAL = 10 * 60 * 1000; // 10 minutes
-  const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://simamiakodi-backend.onrender.com';
-  
-  setInterval(async () => {
-    try {
-      const https = require('https');
-      https.get(`${RENDER_URL}/api/keep-alive`, (res) => {
-        if (res.statusCode === 200) {
-          console.log(`🔄 Self-ping successful (${new Date().toLocaleTimeString()})`);
-        }
-      }).on('error', (err) => {
-        console.error('❌ Self-ping failed:', err.message);
-      });
-    } catch (error) {
-      console.error('❌ Self-ping error:', error.message);
-    }
-  }, SELF_PING_INTERVAL);
-  
-  console.log('🔄 Keep-alive self-ping enabled (every 10 minutes)');
+// ============================================
+// SELF-PING (KEEP SERVER WARM)
+// ============================================
+
+const SELF_PING_INTERVAL = 14 * 60 * 1000; // 14 minutes (Render sleeps after 15 min inactivity)
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://simamiakodi-backend.onrender.com';
+
+function selfPing() {
+  try {
+    const https = require('https');
+    https.get(`${RENDER_URL}/api/keep-alive`, (res) => {
+      if (res.statusCode === 200) {
+        console.log(` Self-ping successful (${new Date().toLocaleTimeString()})`);
+      }
+    }).on('error', (err) => {
+      console.error('❌ Self-ping failed:', err.message);
+    });
+  } catch (error) {
+    console.error('❌ Self-ping error:', error.message);
+  }
+}
+
+// Enable self-ping in production
+if (NODE_ENV === 'production') {
+  setTimeout(selfPing, 60000); // First ping after 1 minute
+  setInterval(selfPing, SELF_PING_INTERVAL); // Then every 14 minutes
+  console.log(` Keep-alive self-ping enabled (every 14 minutes)`);
 }
 
 // ============================================
