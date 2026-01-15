@@ -11,6 +11,22 @@ const pool = require('../config/db');
  */
 const authMiddleware = async (req, res, next) => {
   try {
+    // DEVELOPMENT BYPASS - Remove this in production!
+    if (process.env.NODE_ENV === 'development' && process.env.BYPASS_AUTH === 'true') {
+      console.log('⚠️  AUTH BYPASS ACTIVE - Development Mode');
+      
+      // Mock user object for development
+      req.user = {
+        user_id: 1,
+        username: 'dev_user',
+        email: 'dev@test.com',
+        role: 'admin', // Change to 'landlord' or 'tenant' as needed
+        full_name: 'Development User'
+      };
+      
+      return next();
+    }
+
     // Get token from Authorization header
     // Expected format: "Bearer <token>"
     const authHeader = req.headers.authorization;
@@ -104,6 +120,12 @@ const authMiddleware = async (req, res, next) => {
  */
 const authorize = (...roles) => {
   return (req, res, next) => {
+    // DEVELOPMENT BYPASS - Skip role checks in dev mode
+    if (process.env.NODE_ENV === 'development' && process.env.BYPASS_AUTH === 'true') {
+      console.log(`⚠️  ROLE CHECK BYPASSED - Required: [${roles.join(', ')}]`);
+      return next();
+    }
+
     // Check if user object exists (should be set by authMiddleware)
     if (!req.user) {
       return res.status(401).json({ 
@@ -136,6 +158,18 @@ const authorize = (...roles) => {
  */
 const optionalAuth = async (req, res, next) => {
   try {
+    // DEVELOPMENT BYPASS
+    if (process.env.NODE_ENV === 'development' && process.env.BYPASS_AUTH === 'true') {
+      req.user = {
+        user_id: 1,
+        username: 'dev_user',
+        email: 'dev@test.com',
+        role: 'admin',
+        full_name: 'Development User'
+      };
+      return next();
+    }
+
     const authHeader = req.headers.authorization;
     
     // If no token, just continue without user info

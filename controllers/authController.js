@@ -5,9 +5,6 @@ const pool = require('../config/db');
 
 /**
  * Generate JWT Token
- * @param {number} userId - User ID
- * @param {string} role - User role
- * @returns {string} JWT token
  */
 const generateToken = (userId, role) => {
   return jwt.sign(
@@ -95,9 +92,13 @@ const register = async (req, res) => {
  */
 const login = async (req, res) => {
   try {
+    console.log('=== LOGIN ATTEMPT ===');
+    console.log('Request body:', { username: req.body.username, passwordLength: req.body.password?.length });
+
     // Validate input
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('Validation errors:', errors.array());
       return res.status(400).json({ 
         error: 'Validation failed',
         details: errors.array() 
@@ -107,6 +108,7 @@ const login = async (req, res) => {
     const { username, password } = req.body;
 
     // Find user by username or email
+    console.log('Searching for user:', username);
     const result = await pool.query(
       `SELECT user_id, username, email, password_hash, full_name, phone, role, is_active
        FROM users 
@@ -114,31 +116,48 @@ const login = async (req, res) => {
       [username]
     );
 
+    console.log('Users found:', result.rows.length);
+
     if (result.rows.length === 0) {
+      console.log('❌ User not found in database');
       return res.status(401).json({ 
         error: 'Invalid username or password' 
       });
     }
 
     const user = result.rows[0];
+    console.log('User found:', { 
+      userId: user.user_id, 
+      username: user.username, 
+      email: user.email,
+      role: user.role,
+      isActive: user.is_active 
+    });
 
     // Check if account is active
     if (!user.is_active) {
+      console.log('❌ Account is deactivated');
       return res.status(403).json({ 
         error: 'Your account has been deactivated. Please contact support.' 
       });
     }
 
     // Verify password
+    console.log('Verifying password...');
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    console.log('Password valid:', isValidPassword);
+
     if (!isValidPassword) {
+      console.log('❌ Invalid password');
       return res.status(401).json({ 
         error: 'Invalid username or password' 
       });
     }
 
     // Generate JWT token
+    console.log('Generating JWT token...');
     const token = generateToken(user.user_id, user.role);
+    console.log('✅ Login successful');
 
     // Return success response
     res.json({
@@ -156,9 +175,10 @@ const login = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Login error:', err);
+    console.error('❌ Login error:', err);
     res.status(500).json({ 
-      error: 'Login failed. Please try again later.' 
+      error: 'Login failed. Please try again later.',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 };
@@ -170,7 +190,6 @@ const login = async (req, res) => {
  */
 const getCurrentUser = async (req, res) => {
   try {
-    // req.user is set by authMiddleware
     const result = await pool.query(
       `SELECT user_id, username, email, full_name, phone, role, is_active, created_at, updated_at
        FROM users 
@@ -216,7 +235,6 @@ const getCurrentUser = async (req, res) => {
  */
 const changePassword = async (req, res) => {
   try {
-    // Validate input
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ 
@@ -227,14 +245,12 @@ const changePassword = async (req, res) => {
 
     const { currentPassword, newPassword } = req.body;
 
-    // Check if new password is same as current password
     if (currentPassword === newPassword) {
       return res.status(400).json({ 
         error: 'New password must be different from current password' 
       });
     }
 
-    // Get current password hash from database
     const result = await pool.query(
       'SELECT password_hash FROM users WHERE user_id = $1',
       [req.user.user_id]
@@ -248,7 +264,6 @@ const changePassword = async (req, res) => {
 
     const user = result.rows[0];
 
-    // Verify current password
     const isValid = await bcrypt.compare(currentPassword, user.password_hash);
     if (!isValid) {
       return res.status(401).json({ 
@@ -256,11 +271,9 @@ const changePassword = async (req, res) => {
       });
     }
 
-    // Hash new password
     const salt = await bcrypt.genSalt(12);
     const newPasswordHash = await bcrypt.hash(newPassword, salt);
 
-    // Update password in database
     await pool.query(
       'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
       [newPasswordHash, req.user.user_id]
@@ -288,7 +301,6 @@ const updateProfile = async (req, res) => {
   try {
     const { full_name, phone } = req.body;
 
-    // Build update query dynamically based on provided fields
     const updates = [];
     const values = [];
     let paramCount = 1;
@@ -311,7 +323,6 @@ const updateProfile = async (req, res) => {
       });
     }
 
-    // Add updated_at and user_id
     updates.push('updated_at = CURRENT_TIMESTAMP');
     values.push(req.user.user_id);
 
@@ -360,9 +371,6 @@ const updateProfile = async (req, res) => {
  * @access  Private
  */
 const logout = (req, res) => {
-  // With JWT, logout is primarily handled client-side by removing the token
-  // This endpoint can be used for logging purposes or future token blacklisting
-  
   res.json({ 
     success: true,
     message: 'Logout successful. Please remove your token from client storage.' 
