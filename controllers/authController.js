@@ -1,11 +1,27 @@
+// authController.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
 const pool = require('../config/db');
 
 /**
- * Generate JWT Token
+ * =========================
+ * Helper Functions
+ * =========================
  */
+
+// Hash a plain text password
+const hashPassword = async (password) => {
+  const salt = await bcrypt.genSalt(12);
+  return bcrypt.hash(password, salt);
+};
+
+// Compare password with hash
+const verifyPassword = async (password, hash) => {
+  return bcrypt.compare(password, hash);
+};
+
+// Generate JWT token
 const generateToken = (userId, role) => {
   return jwt.sign(
     { userId, role },
@@ -15,40 +31,31 @@ const generateToken = (userId, role) => {
 };
 
 /**
- * @route   POST /api/auth/register
- * @desc    Register a new user
- * @access  Public
+ * =========================
+ * Register a new user
+ * =========================
  */
 const register = async (req, res) => {
   try {
     // Validate input
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        error: 'Validation failed',
-        details: errors.array() 
-      });
-    }
+    if (!errors.isEmpty())
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
 
     const { username, email, password, full_name, phone, role } = req.body;
 
-    // Check if user already exists
-    const existingUser = await pool.query(
-      'SELECT user_id FROM users WHERE username = $1 OR email = $2',
+    // Check if username/email exists
+    const exists = await pool.query(
+      'SELECT 1 FROM users WHERE username=$1 OR email=$2',
       [username, email]
     );
+    if (exists.rows.length)
+      return res.status(400).json({ error: 'Username or email already exists' });
 
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({ 
-        error: 'Username or email already exists' 
-      });
-    }
+    // Hash password
+    const passwordHash = await hashPassword(password);
 
-    // Hash password with bcrypt
-    const salt = await bcrypt.genSalt(12);
-    const passwordHash = await bcrypt.hash(password, salt);
-
-    // Insert new user into database
+    // Insert user into DB
     const result = await pool.query(
       `INSERT INTO users (username, email, password_hash, full_name, phone, role)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -58,10 +65,9 @@ const register = async (req, res) => {
 
     const user = result.rows[0];
 
-    // Generate JWT token
+    // Generate JWT
     const token = generateToken(user.user_id, user.role);
 
-    // Return success response
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -76,90 +82,47 @@ const register = async (req, res) => {
         createdAt: user.created_at
       }
     });
-
   } catch (err) {
     console.error('Registration error:', err);
-    res.status(500).json({ 
-      error: 'Registration failed. Please try again later.' 
-    });
+    res.status(500).json({ error: 'Registration failed. Please try again later.' });
   }
 };
 
 /**
- * @route   POST /api/auth/login
- * @desc    Login user and return JWT token
- * @access  Public
+ * =========================
+ * Login user
+ * =========================
  */
 const login = async (req, res) => {
   try {
-    console.log('=== LOGIN ATTEMPT ===');
-    console.log('Request body:', { username: req.body.username, passwordLength: req.body.password?.length });
-
-    // Validate input
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      console.log('Validation errors:', errors.array());
-      return res.status(400).json({ 
-        error: 'Validation failed',
-        details: errors.array() 
-      });
-    }
+    if (!errors.isEmpty())
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
 
     const { username, password } = req.body;
 
-    // Find user by username or email
-    console.log('Searching for user:', username);
+    // Find user by username/email
     const result = await pool.query(
-      `SELECT user_id, username, email, password_hash, full_name, phone, role, is_active
-       FROM users 
-       WHERE username = $1 OR email = $1`,
+      'SELECT user_id, username, email, password_hash, role, is_active FROM users WHERE username=$1 OR email=$1',
       [username]
     );
 
-    console.log('Users found:', result.rows.length);
-
-    if (result.rows.length === 0) {
-      console.log('❌ User not found in database');
-      return res.status(401).json({ 
-        error: 'Invalid username or password' 
-      });
-    }
+    if (!result.rows.length)
+      return res.status(401).json({ error: 'Invalid username or password' });
 
     const user = result.rows[0];
-    console.log('User found:', { 
-      userId: user.user_id, 
-      username: user.username, 
-      email: user.email,
-      role: user.role,
-      isActive: user.is_active 
-    });
 
     // Check if account is active
-    if (!user.is_active) {
-      console.log('❌ Account is deactivated');
-      return res.status(403).json({ 
-        error: 'Your account has been deactivated. Please contact support.' 
-      });
-    }
+    if (!user.is_active)
+      return res.status(403).json({ error: 'Account is deactivated. Contact support.' });
 
     // Verify password
-    console.log('Verifying password...');
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
-    console.log('Password valid:', isValidPassword);
+    const isValid = await verifyPassword(password, user.password_hash);
+    if (!isValid) return res.status(401).json({ error: 'Invalid username or password' });
 
-    if (!isValidPassword) {
-      console.log('❌ Invalid password');
-      return res.status(401).json({ 
-        error: 'Invalid username or password' 
-      });
-    }
-
-    // Generate JWT token
-    console.log('Generating JWT token...');
+    // Generate JWT
     const token = generateToken(user.user_id, user.role);
-    console.log('✅ Login successful');
 
-    // Return success response
     res.json({
       success: true,
       message: 'Login successful',
@@ -168,40 +131,28 @@ const login = async (req, res) => {
         userId: user.user_id,
         username: user.username,
         email: user.email,
-        fullName: user.full_name,
-        phone: user.phone,
         role: user.role
       }
     });
-
   } catch (err) {
-    console.error('❌ Login error:', err);
-    res.status(500).json({ 
-      error: 'Login failed. Please try again later.',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Login failed. Please try again later.' });
   }
 };
 
 /**
- * @route   GET /api/auth/me
- * @desc    Get current logged-in user
- * @access  Private
+ * =========================
+ * Get Current Logged-in User
+ * =========================
  */
 const getCurrentUser = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT user_id, username, email, full_name, phone, role, is_active, created_at, updated_at
-       FROM users 
-       WHERE user_id = $1`,
+      'SELECT user_id, username, email, full_name, phone, role, is_active, created_at, updated_at FROM users WHERE user_id=$1',
       [req.user.user_id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'User not found' 
-      });
-    }
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
 
     const user = result.rows[0];
 
@@ -219,127 +170,84 @@ const getCurrentUser = async (req, res) => {
         updatedAt: user.updated_at
       }
     });
-
   } catch (err) {
-    console.error('Get current user error:', err);
-    res.status(500).json({ 
-      error: 'Failed to retrieve user data' 
-    });
+    console.error('Get user error:', err);
+    res.status(500).json({ error: 'Failed to retrieve user data' });
   }
 };
 
 /**
- * @route   PUT /api/auth/change-password
- * @desc    Change user password
- * @access  Private
+ * =========================
+ * Change Password
+ * =========================
  */
 const changePassword = async (req, res) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ 
-        error: 'Validation failed',
-        details: errors.array() 
-      });
-    }
+    if (!errors.isEmpty())
+      return res.status(400).json({ error: 'Validation failed', details: errors.array() });
 
     const { currentPassword, newPassword } = req.body;
 
-    if (currentPassword === newPassword) {
-      return res.status(400).json({ 
-        error: 'New password must be different from current password' 
-      });
-    }
+    if (currentPassword === newPassword)
+      return res.status(400).json({ error: 'New password must differ from current password' });
 
     const result = await pool.query(
-      'SELECT password_hash FROM users WHERE user_id = $1',
+      'SELECT password_hash FROM users WHERE user_id=$1',
       [req.user.user_id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'User not found' 
-      });
-    }
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
 
     const user = result.rows[0];
+    const valid = await verifyPassword(currentPassword, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'Current password is incorrect' });
 
-    const isValid = await bcrypt.compare(currentPassword, user.password_hash);
-    if (!isValid) {
-      return res.status(401).json({ 
-        error: 'Current password is incorrect' 
-      });
-    }
-
-    const salt = await bcrypt.genSalt(12);
-    const newPasswordHash = await bcrypt.hash(newPassword, salt);
-
+    const newHash = await hashPassword(newPassword);
     await pool.query(
-      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
-      [newPasswordHash, req.user.user_id]
+      'UPDATE users SET password_hash=$1, updated_at=CURRENT_TIMESTAMP WHERE user_id=$2',
+      [newHash, req.user.user_id]
     );
 
-    res.json({ 
-      success: true,
-      message: 'Password changed successfully' 
-    });
-
+    res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
     console.error('Change password error:', err);
-    res.status(500).json({ 
-      error: 'Failed to change password. Please try again later.' 
-    });
+    res.status(500).json({ error: 'Failed to change password. Please try again later.' });
   }
 };
 
 /**
- * @route   PUT /api/auth/update-profile
- * @desc    Update user profile information
- * @access  Private
+ * =========================
+ * Update Profile
+ * =========================
  */
 const updateProfile = async (req, res) => {
   try {
     const { full_name, phone } = req.body;
-
     const updates = [];
     const values = [];
     let paramCount = 1;
 
     if (full_name !== undefined) {
-      updates.push(`full_name = $${paramCount}`);
+      updates.push(`full_name=$${paramCount}`);
       values.push(full_name);
       paramCount++;
     }
-
     if (phone !== undefined) {
-      updates.push(`phone = $${paramCount}`);
+      updates.push(`phone=$${paramCount}`);
       values.push(phone);
       paramCount++;
     }
 
-    if (updates.length === 0) {
-      return res.status(400).json({ 
-        error: 'No fields to update' 
-      });
-    }
+    if (!updates.length) return res.status(400).json({ error: 'No fields to update' });
 
-    updates.push('updated_at = CURRENT_TIMESTAMP');
+    updates.push(`updated_at=CURRENT_TIMESTAMP`);
     values.push(req.user.user_id);
 
-    const query = `
-      UPDATE users 
-      SET ${updates.join(', ')}
-      WHERE user_id = $${paramCount}
-      RETURNING user_id, username, email, full_name, phone, role, updated_at
-    `;
+    const query = `UPDATE users SET ${updates.join(', ')} WHERE user_id=$${paramCount} RETURNING user_id, username, email, full_name, phone, role, updated_at`;
 
     const result = await pool.query(query, values);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        error: 'User not found' 
-      });
-    }
+    if (!result.rows.length) return res.status(404).json({ error: 'User not found' });
 
     const user = result.rows[0];
 
@@ -356,24 +264,21 @@ const updateProfile = async (req, res) => {
         updatedAt: user.updated_at
       }
     });
-
   } catch (err) {
     console.error('Update profile error:', err);
-    res.status(500).json({ 
-      error: 'Failed to update profile. Please try again later.' 
-    });
+    res.status(500).json({ error: 'Failed to update profile. Please try again later.' });
   }
 };
 
 /**
- * @route   POST /api/auth/logout
- * @desc    Logout user (client-side token removal)
- * @access  Private
+ * =========================
+ * Logout
+ * =========================
  */
 const logout = (req, res) => {
-  res.json({ 
+  res.json({
     success: true,
-    message: 'Logout successful. Please remove your token from client storage.' 
+    message: 'Logout successful. Remove your token from client storage.'
   });
 };
 
