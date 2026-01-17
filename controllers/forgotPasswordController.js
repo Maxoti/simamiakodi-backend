@@ -22,7 +22,7 @@ exports.forgotPassword = async (req, res) => {
     
     // Always return success (don't reveal if email exists - security)
     if (userResult.rows.length === 0) {
-      console.log('⚠️ Email not found:', email);
+      console.log(' Email not found:', email);
       return res.status(200).json({ 
         message: 'If that email exists, a reset link has been sent' 
       });
@@ -119,8 +119,8 @@ exports.forgotPassword = async (req, res) => {
     // Send email
     const info = await transporter.sendMail(mailOptions);
     
-    console.log('✅ Password reset email sent successfully');
-    console.log('📧 Message ID:', info.messageId);
+    console.log(' Password reset email sent successfully');
+    console.log(' Message ID:', info.messageId);
     
     res.status(200).json({ 
       message: 'Password reset email sent successfully' 
