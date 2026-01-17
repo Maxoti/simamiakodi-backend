@@ -128,9 +128,7 @@ app.get('/api/keep-alive', (req, res) => {
   });
 });
 
-// ============================================
-// SELF-PING (KEEP SERVER WARM)
-// ============================================
+
 
 // ============================================
 // SELF-PING (KEEP SERVER WARM)
@@ -178,7 +176,6 @@ const routes = [
   { path: '/api/payment-plans', file: './routes/paymentPlanRoutes', name: 'Payment Plan' },
   { path: '/api/agents', file: './routes/agentRoutes', name: 'Agent' },
   { path: '/api/maintenance', file: './routes/maintenanceRoutes', name: 'Maintenance' },
-  { path: '/api/sms', file: './routes/smsRoutes', name: 'SMS' },
   { path: '/api/whatsapp', file: './routes/whatsappRoutes', name: 'WhatsApp' }
 ];
 

@@ -13,7 +13,7 @@ const authMiddleware = async (req, res, next) => {
   try {
     // DEVELOPMENT BYPASS - Remove this in production!
     if (process.env.NODE_ENV === 'development' && process.env.BYPASS_AUTH === 'true') {
-      console.log('⚠️  AUTH BYPASS ACTIVE - Development Mode');
+      console.log(' AUTH BYPASS ACTIVE - Development Mode');
       
       // Mock user object for development
       req.user = {
@@ -122,7 +122,7 @@ const authorize = (...roles) => {
   return (req, res, next) => {
     // DEVELOPMENT BYPASS - Skip role checks in dev mode
     if (process.env.NODE_ENV === 'development' && process.env.BYPASS_AUTH === 'true') {
-      console.log(`⚠️  ROLE CHECK BYPASSED - Required: [${roles.join(', ')}]`);
+      console.log(`  ROLE CHECK BYPASSED - Required: [${roles.join(', ')}]`);
       return next();
     }
 

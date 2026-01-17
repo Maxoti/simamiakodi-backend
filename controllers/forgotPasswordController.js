@@ -41,7 +41,7 @@ exports.forgotPassword = async (req, res) => {
     await pool.query(updateQuery, [resetTokenHash, resetTokenExpiry, user.user_id]);
     
     // Create reset URL
-    const resetUrl = `http://localhost:5000/pages/auth/reset-password.html?token=${resetToken}`;
+    const resetUrl = `${frontendUrl}/pages/auth/reset-password.html?token=${resetToken}`;;
     
     // Email options
     const mailOptions = {
@@ -51,7 +51,7 @@ exports.forgotPassword = async (req, res) => {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #198754 0%, #20c997 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0;">🏠 SimamiaKodi</h1>
+            <h1 style="color: white; margin: 0;"> SimamiaKodi</h1>
           </div>
           
           <div style="padding: 30px; background: #f8f9fa;">
@@ -217,7 +217,7 @@ exports.resetPassword = async (req, res) => {
     
     await transporter.sendMail(mailOptions);
     
-    console.log(`✅ Password reset successful for user: ${user.username}`);
+    console.log(` Password reset successful for user: ${user.username}`);
     
     res.status(200).json({ 
       message: 'Password reset successful' 
