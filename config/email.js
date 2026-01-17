@@ -1,51 +1,52 @@
+const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
 
-// Email transporter configuration
-const createTransporter = () => {
-  // For production with real email
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
-    console.log('Configuring email transporter...');
-    console.log('Email Host:', process.env.EMAIL_HOST);
-    console.log('Email Port:', process.env.EMAIL_PORT);
-    console.log('Email User:', process.env.EMAIL_USER);
-    console.log('Email Secure:', process.env.EMAIL_SECURE);
-    
-    const config = {
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.EMAIL_PORT) || 465,
-      secure: process.env.EMAIL_SECURE === 'true', // true for 465, false for 587
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      },
-      // Additional options for better compatibility
-      tls: {
-        rejectUnauthorized: false
-      }
-    };
-    
-    console.log(' Email transporter configured');
-    return nodemailer.createTransport(config);
+let resend;
+if (process.env.RESEND_API_KEY) {
+  resend = new Resend(process.env.RESEND_API_KEY);
+  console.log('✅ Resend configured');
+}
+
+const sendMail = async (mailOptions) => {
+  try {
+    if (process.env.RESEND_API_KEY && resend) {
+      // Use Resend for production
+      console.log('📧 Sending email via Resend...');
+      console.log('To:', mailOptions.to);
+      console.log('Subject:', mailOptions.subject);
+      
+      const result = await resend.emails.send({
+        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        html: mailOptions.html
+      });
+      
+      console.log('✅ Email sent via Resend:', result);
+      return result;
+      
+    } else {
+      // Gmail SMTP fallback for local development
+      console.log('📧 Sending email via Gmail SMTP...');
+      
+      const transporter = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.EMAIL_PORT) || 587,
+        secure: process.env.EMAIL_SECURE === 'true',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD
+        }
+      });
+      
+      const result = await transporter.sendMail(mailOptions);
+      console.log('✅ Email sent via Gmail');
+      return result;
+    }
+  } catch (error) {
+    console.error('❌ Email sending failed:', error);
+    throw error;
   }
-  
-  // For development/testing (logs email to console)
-  console.warn(' Email credentials not configured. Emails will be logged to console.');
-  return nodemailer.createTransport({
-    streamTransport: true,
-    newline: 'unix',
-    buffer: true
-  });
 };
 
-const transporter = createTransporter();
-
-// Verify transporter configuration
-transporter.verify(function(error, success) {
-  if (error) {
-    console.error(' Email transporter verification failed:', error);
-  } else {
-    console.log(' Email server is ready to send messages');
-  }
-});
-
-module.exports = transporter;
+module.exports = { sendMail };

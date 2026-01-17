@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const pool = require('../config/db');
-const transporter = require('../config/email');
+const { sendMail } = require('../config/email');
 
 /**
  * Send password reset email
@@ -22,7 +22,7 @@ exports.forgotPassword = async (req, res) => {
     
     // Always return success (don't reveal if email exists - security)
     if (userResult.rows.length === 0) {
-      console.log(' Email not found:', email);
+      console.log('⚠️ Email not found:', email);
       return res.status(200).json({ 
         message: 'If that email exists, a reset link has been sent' 
       });
@@ -50,16 +50,10 @@ exports.forgotPassword = async (req, res) => {
     const resetUrl = `${frontendUrl}/pages/auth/reset-password.html?token=${resetToken}`;
     
     console.log('🔗 Reset URL:', resetUrl);
-    console.log('📧 Email config:', {
-      host: process.env.EMAIL_HOST,
-      port: process.env.EMAIL_PORT,
-      secure: process.env.EMAIL_SECURE,
-      from: process.env.EMAIL_USER
-    });
     
     // Email options
     const mailOptions = {
-      from: `"SimamiaKodi Support" <${process.env.EMAIL_USER || 'noreply@simamiakodi.com'}>`,
+      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
       to: email,
       subject: 'Password Reset Request - SimamiaKodi',
       html: `
@@ -116,11 +110,11 @@ exports.forgotPassword = async (req, res) => {
     
     console.log('📤 Attempting to send email...');
     
-    // Send email
-    const info = await transporter.sendMail(mailOptions);
+    // Send email using sendMail function
+    const info = await sendMail(mailOptions);
     
-    console.log(' Password reset email sent successfully');
-    console.log(' Message ID:', info.messageId);
+    console.log('✅ Password reset email sent successfully');
+    console.log('📧 Message ID:', info);
     
     res.status(200).json({ 
       message: 'Password reset email sent successfully' 
@@ -193,13 +187,13 @@ exports.resetPassword = async (req, res) => {
     // Send confirmation email
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
     const mailOptions = {
-      from: `"SimamiaKodi Support" <${process.env.EMAIL_USER || 'noreply@simamiakodi.com'}>`,
+      from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
       to: user.email,
       subject: 'Password Changed Successfully - SimamiaKodi',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #198754 0%, #20c997 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0;">🏠 SimamiaKodi</h1>
+            <h1 style="color: white; margin: 0;"> SimamiaKodi</h1>
           </div>
           
           <div style="padding: 30px; background: #f8f9fa;">
@@ -237,8 +231,8 @@ exports.resetPassword = async (req, res) => {
       `
     };
     
-    await transporter.sendMail(mailOptions);
-    console.log('✅ Confirmation email sent');
+    await sendMail(mailOptions);
+    console.log('Confirmation email sent');
     
     res.status(200).json({ 
       message: 'Password reset successful' 
