@@ -10,6 +10,8 @@ exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     
+    console.log('📧 Password reset requested for:', email);
+    
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
@@ -20,12 +22,14 @@ exports.forgotPassword = async (req, res) => {
     
     // Always return success (don't reveal if email exists - security)
     if (userResult.rows.length === 0) {
+      console.log('⚠️ Email not found:', email);
       return res.status(200).json({ 
         message: 'If that email exists, a reset link has been sent' 
       });
     }
     
     const user = userResult.rows[0];
+    console.log('✅ User found:', user.username);
     
     // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -39,9 +43,19 @@ exports.forgotPassword = async (req, res) => {
       WHERE user_id = $3
     `;
     await pool.query(updateQuery, [resetTokenHash, resetTokenExpiry, user.user_id]);
+    console.log('💾 Reset token saved to database');
     
     // Create reset URL
-    const resetUrl = `${frontendUrl}/pages/auth/reset-password.html?token=${resetToken}`;;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
+    const resetUrl = `${frontendUrl}/pages/auth/reset-password.html?token=${resetToken}`;
+    
+    console.log('🔗 Reset URL:', resetUrl);
+    console.log('📧 Email config:', {
+      host: process.env.EMAIL_HOST,
+      port: process.env.EMAIL_PORT,
+      secure: process.env.EMAIL_SECURE,
+      from: process.env.EMAIL_USER
+    });
     
     // Email options
     const mailOptions = {
@@ -51,7 +65,7 @@ exports.forgotPassword = async (req, res) => {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #198754 0%, #20c997 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0;"> SimamiaKodi</h1>
+            <h1 style="color: white; margin: 0;">🏠 SimamiaKodi</h1>
           </div>
           
           <div style="padding: 30px; background: #f8f9fa;">
@@ -100,23 +114,25 @@ exports.forgotPassword = async (req, res) => {
       `
     };
     
+    console.log('📤 Attempting to send email...');
+    
     // Send email
     const info = await transporter.sendMail(mailOptions);
     
-    // Log for development
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('📧 Password reset email sent');
-      console.log('Reset URL:', resetUrl);
-      console.log('Message ID:', info.messageId);
-    }
+    console.log('✅ Password reset email sent successfully');
+    console.log('📧 Message ID:', info.messageId);
     
     res.status(200).json({ 
       message: 'Password reset email sent successfully' 
     });
     
   } catch (error) {
-    console.error('Forgot password error:', error);
-    res.status(500).json({ error: 'Failed to send reset email' });
+    console.error('❌ Forgot password error:', error);
+    console.error('Error details:', error.message);
+    res.status(500).json({ 
+      error: 'Failed to send reset email',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
@@ -126,6 +142,8 @@ exports.forgotPassword = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
+    
+    console.log('🔄 Password reset attempt with token');
     
     if (!token || !newPassword) {
       return res.status(400).json({ error: 'Token and new password are required' });
@@ -148,12 +166,14 @@ exports.resetPassword = async (req, res) => {
     const userResult = await pool.query(userQuery, [resetTokenHash]);
     
     if (userResult.rows.length === 0) {
+      console.log('❌ Invalid or expired token');
       return res.status(400).json({ 
         error: 'Invalid or expired reset token' 
       });
     }
     
     const user = userResult.rows[0];
+    console.log('✅ Valid token for user:', user.username);
     
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -168,8 +188,10 @@ exports.resetPassword = async (req, res) => {
       WHERE user_id = $2
     `;
     await pool.query(updateQuery, [hashedPassword, user.user_id]);
+    console.log('✅ Password updated successfully');
     
     // Send confirmation email
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5000';
     const mailOptions = {
       from: `"SimamiaKodi Support" <${process.env.EMAIL_USER || 'noreply@simamiakodi.com'}>`,
       to: user.email,
@@ -177,7 +199,7 @@ exports.resetPassword = async (req, res) => {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #198754 0%, #20c997 100%); padding: 30px; text-align: center;">
-            <h1 style="color: white; margin: 0;"> SimamiaKodi</h1>
+            <h1 style="color: white; margin: 0;">🏠 SimamiaKodi</h1>
           </div>
           
           <div style="padding: 30px; background: #f8f9fa;">
@@ -188,7 +210,7 @@ exports.resetPassword = async (req, res) => {
             <p>Your password has been successfully changed. You can now log in with your new password.</p>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="http://localhost:5000/pages/auth/login.html" 
+              <a href="${frontendUrl}/pages/auth/login.html" 
                  style="background: #198754; 
                         color: white; 
                         padding: 15px 30px; 
@@ -216,15 +238,14 @@ exports.resetPassword = async (req, res) => {
     };
     
     await transporter.sendMail(mailOptions);
-    
-    console.log(` Password reset successful for user: ${user.username}`);
+    console.log('✅ Confirmation email sent');
     
     res.status(200).json({ 
       message: 'Password reset successful' 
     });
     
   } catch (error) {
-    console.error('Reset password error:', error);
+    console.error('❌ Reset password error:', error);
     res.status(500).json({ error: 'Failed to reset password' });
   }
 };
