@@ -27,14 +27,20 @@ app.use(compression());
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
+  'http://localhost:5501',
   'http://127.0.0.1:5500',
+  'http://127.0.0.1:5501',
+  'http://127.0.0.1:5502',
   'https://simamiakodi-frontend.vercel.app',
-  'https://simamiakodi-frontend-git-main-edusync1.vercel.app'
+  'https://simamiakodi-frontend-git-main-edusync1.vercel.app',
+  /^https:\/\/.*\.vercel\.app$/,
+  /^http:\/\/localhost:\d+$/,      // Allow any localhost port
+  /^http:\/\/127\.0\.0\.1:\d+$/    // Allow any 127.0.0.1 port
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman)
+    // Allow requests with no origin (mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
     
     // Check if origin matches any allowed origin (string or regex)
@@ -49,17 +55,36 @@ app.use(cors({
     });
     
     if (isAllowed) {
+      console.log(` CORS allowed: ${origin}`);  // ← Add logging
       callback(null, true);
     } else {
-      console.warn(`⚠️ Blocked CORS request from: ${origin}`);
-      callback(null, false);
+      console.warn(` Blocked CORS request from: ${origin}`);
+      callback(null, false);  // ← Change to true for testing: callback(null, true)
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: true,
   optionsSuccessStatus: 200
 }));
+
+// Add backup CORS headers
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
 
 // Body parsing
 app.use(bodyParser.json({ limit: '10mb' }));
