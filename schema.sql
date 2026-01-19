@@ -1,28 +1,12 @@
 -- =====================================================
--- SimamiaKodi Database Schema
+-- SimamiaKodi Database Schema - SAFE VERSION
+-- This version DOES NOT delete existing data
 -- =====================================================
-
--- Drop existing tables (in reverse order of dependencies)
-DROP TABLE IF EXISTS sms_logs CASCADE;
-DROP TABLE IF EXISTS whatsapp_messages CASCADE;
-DROP TABLE IF EXISTS maintenance_requests CASCADE;
-DROP TABLE IF EXISTS utility_bills CASCADE;
-DROP TABLE IF EXISTS utilities CASCADE;
-DROP TABLE IF EXISTS expenses CASCADE;
-DROP TABLE IF EXISTS payment_plans CASCADE;
-DROP TABLE IF EXISTS payments CASCADE;
-DROP TABLE IF EXISTS tenants CASCADE;
-DROP TABLE IF EXISTS units CASCADE;
-DROP TABLE IF EXISTS properties CASCADE;
-DROP TABLE IF EXISTS caretakers CASCADE;
-DROP TABLE IF EXISTS agent_commissions CASCADE;
-DROP TABLE IF EXISTS agents CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
 
 -- =====================================================
 -- USERS TABLE
 -- =====================================================
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     user_id SERIAL PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -40,7 +24,7 @@ CREATE TABLE users (
 -- =====================================================
 -- PROPERTIES TABLE
 -- =====================================================
-CREATE TABLE properties (
+CREATE TABLE IF NOT EXISTS properties (
     property_id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
     property_name VARCHAR(255) NOT NULL,
@@ -57,9 +41,9 @@ CREATE TABLE properties (
 );
 
 -- =====================================================
--- AGENTS TABLE (Agent Information)
+-- AGENTS TABLE
 -- =====================================================
-CREATE TABLE agents (
+CREATE TABLE IF NOT EXISTS agents (
     agent_id SERIAL PRIMARY KEY,
     full_name VARCHAR(255) NOT NULL,
     phone VARCHAR(20) NOT NULL,
@@ -74,7 +58,7 @@ CREATE TABLE agents (
 -- =====================================================
 -- CARETAKERS TABLE
 -- =====================================================
-CREATE TABLE caretakers (
+CREATE TABLE IF NOT EXISTS caretakers (
     caretaker_id SERIAL PRIMARY KEY,
     full_name VARCHAR(255) NOT NULL,
     phone VARCHAR(20) NOT NULL,
@@ -90,7 +74,7 @@ CREATE TABLE caretakers (
 -- =====================================================
 -- UNITS TABLE
 -- =====================================================
-CREATE TABLE units (
+CREATE TABLE IF NOT EXISTS units (
     unit_id SERIAL PRIMARY KEY,
     property_id INTEGER NOT NULL REFERENCES properties(property_id) ON DELETE CASCADE,
     unit_number VARCHAR(50) NOT NULL,
@@ -110,7 +94,7 @@ CREATE TABLE units (
 -- =====================================================
 -- TENANTS TABLE
 -- =====================================================
-CREATE TABLE tenants (
+CREATE TABLE IF NOT EXISTS tenants (
     tenant_id SERIAL PRIMARY KEY,
     property_id INTEGER REFERENCES properties(property_id) ON DELETE SET NULL,
     unit_id INTEGER REFERENCES units(unit_id) ON DELETE SET NULL,
@@ -131,9 +115,9 @@ CREATE TABLE tenants (
 );
 
 -- =====================================================
--- AGENT COMMISSIONS TABLE (Commission Transactions)
+-- AGENT COMMISSIONS TABLE
 -- =====================================================
-CREATE TABLE agent_commissions (
+CREATE TABLE IF NOT EXISTS agent_commissions (
     commission_id SERIAL PRIMARY KEY,
     agent_id INTEGER REFERENCES agents(agent_id) ON DELETE SET NULL,
     tenant_id INTEGER REFERENCES tenants(tenant_id) ON DELETE SET NULL,
@@ -150,7 +134,7 @@ CREATE TABLE agent_commissions (
 -- =====================================================
 -- PAYMENTS TABLE
 -- =====================================================
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     payment_id SERIAL PRIMARY KEY,
     tenant_id INTEGER REFERENCES tenants(tenant_id) ON DELETE CASCADE,
     property_id INTEGER REFERENCES properties(property_id) ON DELETE SET NULL,
@@ -170,7 +154,7 @@ CREATE TABLE payments (
 -- =====================================================
 -- PAYMENT PLANS TABLE
 -- =====================================================
-CREATE TABLE payment_plans (
+CREATE TABLE IF NOT EXISTS payment_plans (
     plan_id SERIAL PRIMARY KEY,
     tenant_id INTEGER REFERENCES tenants(tenant_id) ON DELETE CASCADE,
     property_id INTEGER REFERENCES properties(property_id) ON DELETE SET NULL,
@@ -192,7 +176,7 @@ CREATE TABLE payment_plans (
 -- =====================================================
 -- EXPENSES TABLE
 -- =====================================================
-CREATE TABLE expenses (
+CREATE TABLE IF NOT EXISTS expenses (
     expense_id SERIAL PRIMARY KEY,
     property_id INTEGER REFERENCES properties(property_id) ON DELETE SET NULL,
     unit_id INTEGER REFERENCES units(unit_id) ON DELETE SET NULL,
@@ -210,7 +194,7 @@ CREATE TABLE expenses (
 -- =====================================================
 -- UTILITIES TABLE
 -- =====================================================
-CREATE TABLE utilities (
+CREATE TABLE IF NOT EXISTS utilities (
     utility_id SERIAL PRIMARY KEY,
     unit_id INTEGER REFERENCES units(unit_id) ON DELETE CASCADE,
     tenant_id INTEGER REFERENCES tenants(tenant_id) ON DELETE CASCADE,
@@ -233,7 +217,7 @@ CREATE TABLE utilities (
 -- =====================================================
 -- MAINTENANCE REQUESTS TABLE
 -- =====================================================
-CREATE TABLE maintenance_requests (
+CREATE TABLE IF NOT EXISTS maintenance_requests (
     request_id SERIAL PRIMARY KEY,
     property_id INTEGER REFERENCES properties(property_id) ON DELETE CASCADE,
     unit_id INTEGER REFERENCES units(unit_id) ON DELETE SET NULL,
@@ -254,9 +238,7 @@ CREATE TABLE maintenance_requests (
 -- =====================================================
 -- WHATSAPP MESSAGES TABLE
 -- =====================================================
-DROP TABLE IF EXISTS whatsapp_messages CASCADE;
-
-CREATE TABLE whatsapp_messages (
+CREATE TABLE IF NOT EXISTS whatsapp_messages (
     message_id SERIAL PRIMARY KEY,
     tenant_id INTEGER REFERENCES tenants(tenant_id) ON DELETE CASCADE,
     recipient_phone VARCHAR(20) NOT NULL,
@@ -271,10 +253,11 @@ CREATE TABLE whatsapp_messages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
 -- =====================================================
 -- SMS LOGS TABLE
 -- =====================================================
-CREATE TABLE sms_logs (
+CREATE TABLE IF NOT EXISTS sms_logs (
     log_id SERIAL PRIMARY KEY,
     phone_number VARCHAR(20) NOT NULL,
     message TEXT NOT NULL,
@@ -287,57 +270,24 @@ CREATE TABLE sms_logs (
 );
 
 -- =====================================================
--- INDEXES
+-- INDEXES (CREATE IF NOT EXISTS)
 -- =====================================================
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_properties_name ON properties(property_name);
-CREATE INDEX idx_units_property ON units(property_id);
-CREATE INDEX idx_units_occupied ON units(is_occupied);
-CREATE INDEX idx_tenants_property ON tenants(property_id);
-CREATE INDEX idx_tenants_unit ON tenants(unit_id);
-CREATE INDEX idx_tenants_active ON tenants(is_active);
-CREATE INDEX idx_tenants_phone ON tenants(phone);
-CREATE INDEX idx_payments_tenant ON payments(tenant_id);
-CREATE INDEX idx_payments_date ON payments(payment_date);
-CREATE INDEX idx_payments_month ON payments(payment_month);
-CREATE INDEX idx_payment_plans_tenant ON payment_plans(tenant_id);
-CREATE INDEX idx_payment_plans_status ON payment_plans(status);
-CREATE INDEX idx_expenses_property ON expenses(property_id);
-CREATE INDEX idx_expenses_date ON expenses(expense_date);
-CREATE INDEX idx_utilities_property ON utilities(unit_id);
-CREATE INDEX idx_maintenance_property ON maintenance_requests(property_id);
-CREATE INDEX idx_maintenance_status ON maintenance_requests(status);
-CREATE INDEX idx_agent_commissions_agent_id ON agent_commissions(agent_id);
-CREATE INDEX idx_agent_commissions_tenant_id ON agent_commissions(tenant_id);
-CREATE INDEX idx_agent_commissions_property_id ON agent_commissions(property_id);
-CREATE INDEX idx_agent_commissions_status ON agent_commissions(status);
-CREATE INDEX idx_sms_logs_phone ON sms_logs(phone_number);
-CREATE INDEX idx_sms_logs_status ON sms_logs(status);
-CREATE INDEX idx_sms_logs_date ON sms_logs(sent_at);
-CREATE INDEX idx_sms_cost ON sms_logs(cost);
-CREATE INDEX idx_sms_delivered ON sms_logs(delivered_at);
-CREATE INDEX idx_utilities_unit_id ON utilities(unit_id);
-CREATE INDEX idx_utilities_tenant_id ON utilities(tenant_id);
-CREATE INDEX idx_utilities_payment_status ON utilities(payment_status);
-CREATE INDEX idx_utilities_billing_month ON utilities(billing_month);
-
--- Create indexes
-CREATE INDEX idx_whatsapp_messages_tenant_id ON whatsapp_messages(tenant_id);
-CREATE INDEX idx_whatsapp_messages_status ON whatsapp_messages(status);
-CREATE INDEX idx_whatsapp_messages_sent_at ON whatsapp_messages(sent_at DESC);
-CREATE INDEX idx_whatsapp_messages_type ON whatsapp_messages(message_type);
-CREATE INDEX idx_whatsapp_messages_phone ON whatsapp_messages(recipient_phone);
-
-
-
--- Add comments
-COMMENT ON TABLE whatsapp_messages IS 'Stores all WhatsApp messages sent to tenants';
-COMMENT ON COLUMN whatsapp_messages.tenant_id IS 'Foreign key linking message to a tenant';
-COMMENT ON COLUMN whatsapp_messages.message_type IS 'Type of message: rent_reminder, payment, maintenance, welcome, overdue, general';
-COMMENT ON COLUMN whatsapp_messages.status IS 'Message status: pending, sent, delivered, read, failed';
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_properties_name ON properties(property_name);
+CREATE INDEX IF NOT EXISTS idx_units_property ON units(property_id);
+CREATE INDEX IF NOT EXISTS idx_units_occupied ON units(is_occupied);
+CREATE INDEX IF NOT EXISTS idx_tenants_property ON tenants(property_id);
+CREATE INDEX IF NOT EXISTS idx_tenants_unit ON tenants(unit_id);
+CREATE INDEX IF NOT EXISTS idx_tenants_active ON tenants(is_active);
+CREATE INDEX IF NOT EXISTS idx_tenants_phone ON tenants(phone);
+CREATE INDEX IF NOT EXISTS idx_payments_tenant ON payments(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date);
+CREATE INDEX IF NOT EXISTS idx_payments_month ON payments(payment_month);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_tenant_id ON whatsapp_messages(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_status ON whatsapp_messages(status);
 
 -- =====================================================
--- TRIGGERS
+-- FUNCTIONS AND TRIGGERS
 -- =====================================================
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
@@ -347,43 +297,27 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Drop triggers if they exist, then create them
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS update_properties_updated_at ON properties;
 CREATE TRIGGER update_properties_updated_at BEFORE UPDATE ON properties FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS update_units_updated_at ON units;
 CREATE TRIGGER update_units_updated_at BEFORE UPDATE ON units FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS update_tenants_updated_at ON tenants;
 CREATE TRIGGER update_tenants_updated_at BEFORE UPDATE ON tenants FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS update_payments_updated_at ON payments;
 CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+DROP TRIGGER IF EXISTS update_payment_plans_updated_at ON payment_plans;
 CREATE TRIGGER update_payment_plans_updated_at BEFORE UPDATE ON payment_plans FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE OR REPLACE FUNCTION update_utilities_timestamp()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS utilities_updated_at ON utilities;
+CREATE TRIGGER utilities_updated_at BEFORE UPDATE ON utilities FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
-CREATE TRIGGER utilities_updated_at
-BEFORE UPDATE ON utilities
-FOR EACH ROW
-EXECUTE FUNCTION update_utilities_timestamp();
-
-
--- Add trigger to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_whatsapp_messages_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER whatsapp_messages_updated_at
-BEFORE UPDATE ON whatsapp_messages
-FOR EACH ROW
-EXECUTE FUNCTION update_whatsapp_messages_updated_at();
-
--- =====================================================
--- SAMPLE DATA (Optional - Comment out if not needed)
--- =====================================================
-
--- Insert default admin user (password: admin123)
+DROP TRIGGER IF EXISTS whatsapp_messages_updated_at ON whatsapp_messages;
+CREATE TRIGGER whatsapp_messages_updated_at BEFORE UPDATE ON whatsapp_messages FOR EACH ROW EXECUTE FUNCTION update_updated_at();
