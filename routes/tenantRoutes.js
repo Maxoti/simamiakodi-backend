@@ -22,7 +22,6 @@ router.post('/', async (req, res) => {
       deposit_paid
     } = req.body;
 
-    // Validation - UPDATED: removed id_number, added email
     if (!full_name || !phone || !email || !unit_id) {
       return res.status(400).json({
         success: false,
@@ -30,7 +29,6 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Validate phone
     if (!validatePhone(phone)) {
       return res.status(400).json({
         success: false,
@@ -38,7 +36,6 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return res.status(400).json({
@@ -47,7 +44,6 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Check if email already exists
     const emailCheck = await pool.query(
       'SELECT tenant_id FROM tenants WHERE email = $1 AND is_active = true',
       [email]
@@ -60,38 +56,35 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Normalize phone numbers
     const normalizedPhone = normalizePhone(phone);
     const normalizedEmergencyPhone = emergency_contact_phone 
       ? normalizePhone(emergency_contact_phone) 
       : null;
 
-    // Insert tenant - UPDATED: removed id_number, added email
-   // Insert tenant - removed id_number and property_id, added email
-const result = await pool.query(
-  `INSERT INTO tenants (
-    full_name, 
-    phone, 
-    email,
-    unit_id,
-    emergency_contact_name, 
-    emergency_contact_phone, 
-    move_in_date, 
-    deposit_paid
-  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)  
-  RETURNING *`,
-  [
-    full_name,
-    normalizedPhone,
-    email,
-    unit_id,
-    emergency_contact_name,
-    normalizedEmergencyPhone,
-    move_in_date,
-    deposit_paid || 0
-  ]
-);
-    // Update unit occupancy
+    const result = await pool.query(
+      `INSERT INTO tenants (
+        full_name, 
+        phone, 
+        email,
+        unit_id,
+        emergency_contact_name, 
+        emergency_contact_phone, 
+        move_in_date, 
+        deposit_paid
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)  
+      RETURNING *`,
+      [
+        full_name,
+        normalizedPhone,
+        email,
+        unit_id,
+        emergency_contact_name,
+        normalizedEmergencyPhone,
+        move_in_date,
+        deposit_paid || 0
+      ]
+    );
+
     if (unit_id) {
       await pool.query(
         'UPDATE units SET is_occupied = true WHERE unit_id = $1',
@@ -107,7 +100,7 @@ const result = await pool.query(
   } catch (error) {
     console.error('Error creating tenant:', error);
     
-    if (error.code === '23505') { // Unique violation
+    if (error.code === '23505') {
       return res.status(400).json({
         success: false,
         error: 'A tenant with this email already exists'
@@ -129,6 +122,8 @@ router.get('/', async (req, res) => {
         t.*,
         u.unit_number,
         u.monthly_rent,
+        u.bedrooms,
+        u.bathrooms,
         p.property_name,
         p.location
       FROM tenants t
@@ -181,7 +176,7 @@ router.get('/arrears', async (req, res) => {
   }
 });
 
-// GET - Get specific tenant
+// GET - Get specific tenant (FIXED - includes bedrooms)
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -192,6 +187,9 @@ router.get('/:id', async (req, res) => {
         u.unit_number,
         u.monthly_rent,
         u.house_type,
+        u.bedrooms,
+        u.bathrooms,
+        u.square_feet,
         p.property_name,
         p.location
       FROM tenants t
@@ -226,7 +224,6 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Validate phone if provided
     if (updates.phone && !validatePhone(updates.phone)) {
       return res.status(400).json({
         success: false,
@@ -234,7 +231,6 @@ router.put('/:id', async (req, res) => {
       });
     }
 
-    // Validate email if provided
     if (updates.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(updates.email)) {
@@ -245,7 +241,6 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    // Normalize phone numbers
     if (updates.phone) {
       updates.phone = normalizePhone(updates.phone);
     }
@@ -298,7 +293,6 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get tenant's unit_id before soft delete
     const tenant = await pool.query(
       'SELECT unit_id FROM tenants WHERE tenant_id = $1',
       [id]
@@ -311,7 +305,6 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    // Soft delete
     const result = await pool.query(
       `UPDATE tenants 
        SET is_active = false, move_out_date = CURRENT_DATE 
@@ -320,7 +313,6 @@ router.delete('/:id', async (req, res) => {
       [id]
     );
 
-    // Update unit occupancy
     if (tenant.rows[0].unit_id) {
       await pool.query(
         'UPDATE units SET is_occupied = false WHERE unit_id = $1',
