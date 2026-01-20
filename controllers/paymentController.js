@@ -1,8 +1,6 @@
 ﻿const pool = require('../config/db');
 
-/**
- * Get all payments with related information
- */
+
 const getAllPayments = async (req, res, next) => {
   try {
     const result = await pool.query(`
@@ -24,11 +22,12 @@ const getAllPayments = async (req, res, next) => {
         t.full_name as tenant_name,
         t.phone as tenant_phone,
         u.unit_number,
-        pr.property_name
+        COALESCE(pr.property_name, pr2.property_name, 'Unknown Property') as property_name
       FROM payments p
       LEFT JOIN tenants t ON p.tenant_id = t.tenant_id
-      LEFT JOIN properties pr ON p.property_id = pr.property_id
       LEFT JOIN units u ON p.unit_id = u.unit_id
+      LEFT JOIN properties pr ON p.property_id = pr.property_id
+      LEFT JOIN properties pr2 ON u.property_id = pr2.property_id
       ORDER BY p.payment_date DESC, p.created_at DESC
     `);
 
