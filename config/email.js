@@ -9,25 +9,12 @@ if (process.env.RESEND_API_KEY) {
 
 const sendMail = async (mailOptions) => {
   try {
-    if (process.env.RESEND_API_KEY && resend) {
-      // Use Resend for production
-      console.log('📧 Sending email via Resend...');
+    // FORCE GMAIL - Check if Gmail credentials exist first
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+      // Use Gmail SMTP
+      console.log('📧 Sending email via Gmail SMTP...');
       console.log('To:', mailOptions.to);
       console.log('Subject:', mailOptions.subject);
-      
-      const result = await resend.emails.send({
-        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
-        to: mailOptions.to,
-        subject: mailOptions.subject,
-        html: mailOptions.html
-      });
-      
-      console.log('✅ Email sent via Resend:', result);
-      return result;
-      
-    } else {
-      // Gmail SMTP fallback for local development
-      console.log('📧 Sending email via Gmail SMTP...');
       
       const transporter = nodemailer.createTransport({
         host: process.env.EMAIL_HOST || 'smtp.gmail.com',
@@ -42,6 +29,24 @@ const sendMail = async (mailOptions) => {
       const result = await transporter.sendMail(mailOptions);
       console.log('✅ Email sent via Gmail');
       return result;
+      
+    } else if (process.env.RESEND_API_KEY && resend) {
+      // Fallback to Resend only if Gmail not configured
+      console.log('📧 Sending email via Resend...');
+      console.log('To:', mailOptions.to);
+      console.log('Subject:', mailOptions.subject);
+      
+      const result = await resend.emails.send({
+        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
+        to: mailOptions.to,
+        subject: mailOptions.subject,
+        html: mailOptions.html
+      });
+      
+      console.log('✅ Email sent via Resend:', result);
+      return result;
+    } else {
+      throw new Error('No email service configured');
     }
   } catch (error) {
     console.error('❌ Email sending failed:', error);
